@@ -1,0 +1,10 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+#map {
+    width: 80%;
+    height: 500px;
+    margin: 0 auto;
+}
