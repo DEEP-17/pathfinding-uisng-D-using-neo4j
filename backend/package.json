@@ -12,8 +12,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "mongoose": "^5.10.9",
-    "neo4j-driver": "^5.28.1"
+    "mongoose": "^8.12.2",
+    "neo4j-driver": "^5.28.1",
+    "project-folder-backend": "file:"
   },
   "devDependencies": {
     "nodemon": "^2.0.4"
