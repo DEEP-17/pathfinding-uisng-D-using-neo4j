@@ -47,16 +47,32 @@ export const findShortestPath = async (start, end) => {
         console.log(`Start City: ${startCity}, End City: ${endCity}`);
 
         // A* Algorithm Query
-        // const pathQuery1 = `
-        //     MATCH (start:CityA {city_ascii: $startCity}), (goal:CityB {city_ascii: $endCity})
-        //     CALL apoc.algo.aStar(start, goal, 'CONNECTED_TO', 'distance','lat', 'lng')
-        //     YIELD path, weight
-        //     RETURN [node IN nodes(path) | {
-        //         name: node.city_ascii,
-        //         latitude: node.lat,
-        //         longitude: node.lng
-        //     }] AS path, weight AS totalCost;
-        // `;
+        const pathQuery1 = `
+            MATCH (start:City {from_city: $startCity})
+            MATCH (goal:City {to_city: $endCity})
+            MATCH (n:City)
+            SET n.latitude = COALESCE(n.lat1, n.lat2),
+                n.longitude = COALESCE(n.lon1, n.log2)
+            WITH start, goal
+
+            CALL apoc.algo.aStar(
+                start,
+                goal,
+                'Connects',
+                'distance',
+                'latitude',
+                'longitude'
+            )
+            YIELD path, weight
+
+            RETURN
+                [node IN nodes(path) | {
+                    name: COALESCE(node.from_city, node.to_city),
+                    latitude: node.latitude,
+                    longitude: node.longitude
+                }] AS path,
+                weight AS totalCost;
+        `;
 
         const pathQuery2 = `
             MATCH (start:City {from_city: $startCity})
@@ -71,7 +87,7 @@ export const findShortestPath = async (start, end) => {
                 }] AS path, weight AS totalCost;
         `
 
-        const pathResult = await session.run(pathQuery2, { startCity, endCity });
+        const pathResult = await session.run(pathQuery1, { startCity, endCity });
         console.log(pathResult);
         if (pathResult.records[0].length === 0) {
             return { message: "No path found.", path: [] };
