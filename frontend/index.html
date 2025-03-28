@@ -1,24 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamic A* Pathfinding with Neo4j</title>
+    <meta name="description" content="Find eco-friendly routes with A* pathfinding algorithm" />
+    <meta name="author" content="Lovable" />
 
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Dynamic A* Pathfinding</title>
-        <link rel="stylesheet" href="styles.css">
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    </head>
+    <meta property="og:title" content="PathFinder Eco" />
+    <meta property="og:description" content="Find eco-friendly routes with A* pathfinding algorithm" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-    <body>
-        <h1>Dynamic A* Pathfinding with Neo4j</h1>
-        <div class="controls">
-            <input type="text" id="start" placeholder="Start coordinates (lat,lng)" readonly>
-            <input type="text" id="end" placeholder="End coordinates (lat,lng)" readonly>
-            <button onclick="findPath()">Find Path</button>
-        </div>
-        <div id="map"></div>
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-        <script src="script.js"></script>
-    </body>
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+  </head>
 
+  <body>
+    <div id="root"></div>
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

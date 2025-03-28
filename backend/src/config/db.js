@@ -1,5 +1,5 @@
-import neo4j from "neo4j-driver";
 import dotenv from "dotenv";
+import neo4j from "neo4j-driver";
 
 // Load environment variables
 dotenv.config();
@@ -22,3 +22,4 @@ const session = driver.session();
 console.log("✅ Connected to Neo4j AuraDB");
 
 export { driver, session };
+
