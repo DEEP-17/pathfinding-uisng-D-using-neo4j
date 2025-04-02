@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { toast } from '@/components/ui/use-toast';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { toast } from '@/components/ui/use-toast';
+import React, { useEffect, useRef, useState } from 'react';
 
 type Location = {
   name: string;
@@ -21,12 +21,9 @@ interface MapComponentProps {
 const MapComponent: React.FC<MapComponentProps> = ({ onPathFound }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const startMarkerRef = useRef<L.Marker | null>(null);
-  const endMarkerRef = useRef<L.Marker | null>(null);
-  const pathLayerRef = useRef<L.Polyline | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
 
-  const [startCoordinates, setStartCoordinates] = useState<string>('');
-  const [endCoordinates, setEndCoordinates] = useState<string>('');
+  const [waypoints, setWaypoints] = useState<Location[]>([]);
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
@@ -39,39 +36,21 @@ const MapComponent: React.FC<MapComponentProps> = ({ onPathFound }) => {
       mapInstanceRef.current = map;
 
       map.on('click', function (e) {
-        if (!startMarkerRef.current) {
-          startMarkerRef.current = L.marker(e.latlng).addTo(map);
-          const coords = `${e.latlng.lat},${e.latlng.lng}`;
-          setStartCoordinates(coords);
-          toast({
-            title: "Start point selected",
-            description: "Click on the map to set the end point.",
-          });
-        } else if (!endMarkerRef.current) {
-          endMarkerRef.current = L.marker(e.latlng).addTo(map);
-          const coords = `${e.latlng.lat},${e.latlng.lng}`;
-          setEndCoordinates(coords);
-          toast({
-            title: "End point selected",
-            description: "Click Find Path to see the route.",
-          });
-        } else {
-          if (startMarkerRef.current) map.removeLayer(startMarkerRef.current);
-          if (endMarkerRef.current) map.removeLayer(endMarkerRef.current);
-          if (pathLayerRef.current) map.removeLayer(pathLayerRef.current);
+        const newWaypoint: Location = {
+          name: `Waypoint`,
+          latitude: e.latlng.lat,
+          longitude: e.latlng.lng,
+        };
 
-          startMarkerRef.current = L.marker(e.latlng).addTo(map);
-          const coords = `${e.latlng.lat},${e.latlng.lng}`;
-          setStartCoordinates(coords);
-          setEndCoordinates('');
-          endMarkerRef.current = null;
-          pathLayerRef.current = null;
+        const newMarker = L.marker(e.latlng).addTo(map);
+        markersRef.current.push(newMarker);
 
-          toast({
-            title: "Reset locations",
-            description: "Start point set. Click on the map to set the end point.",
-          });
-        }
+        setWaypoints((prev) => [...prev, newWaypoint]);
+
+        toast({
+          title: `${newWaypoint.name} selected`,
+          description: `Latitude: ${newWaypoint.latitude}, Longitude: ${newWaypoint.longitude}`,
+        });
       });
     }
 
@@ -82,55 +61,79 @@ const MapComponent: React.FC<MapComponentProps> = ({ onPathFound }) => {
       }
     };
   }, []);
-
   const findPath = async () => {
-    if (!startCoordinates || !endCoordinates) {
+    if (waypoints.length < 2) {
       toast({
-        title: "Missing locations",
-        description: "Please select both start and end points on the map.",
-        variant: "destructive"
+        title: "Insufficient points",
+        description: "Please select at least two points on the map.",
+        variant: "destructive",
       });
       return;
     }
 
+    let fullPath = [];
+    let totalDistance = 0;
+
     try {
-      const response = await fetch(`http://localhost:5000/api/find-path?start=${startCoordinates}&end=${endCoordinates}`);
 
-      if (!response.ok) {
-        throw new Error(`Server Error: ${response.statusText}`);
+      for (let i = 0; i < waypoints.length - 1; i++) {
+        const start = waypoints[i];
+        const end = waypoints[i + 1];
+
+        const startCoordinates = `${start.latitude},${start.longitude}`;
+        const endCoordinates = `${end.latitude},${end.longitude}`;
+
+        const response = await fetch(
+          `http://localhost:5000/api/find-path?start=${startCoordinates}&end=${endCoordinates}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Server Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.path || !data.path.length) {
+          toast({
+            title: `No path found between points ${i + 1} and ${i + 2}`,
+            description: "Please try different locations.",
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        const filteredPath = data.path.filter(
+          (node) => node.name !== null && node.latitude !== null && node.longitude !== null
+        );
+
+        if (!filteredPath.length) {
+          toast({
+            title: "Invalid path data",
+            description: "The path data is invalid.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (i === 0) {
+          fullPath = filteredPath;
+        } else {
+          fullPath = [...fullPath, ...filteredPath.slice(1)];
+        }
+
+        totalDistance += data.totalCost;
       }
 
-      const data = await response.json();
+      drawPath(fullPath);
 
-      if (!data.path || !data.path.length) {
-        toast({
-          title: "No path found",
-          description: "Please try different locations.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const filteredPath = data.path.filter(node => node.name !== null && node.latitude !== null && node.longitude !== null);
-
-      if (!filteredPath.length) {
-        toast({
-          title: "Invalid path data",
-          description: "The path data is invalid.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      drawPath(filteredPath);
-      onPathFound(data);
+      onPathFound({ path: fullPath, totalCost: totalDistance });
 
     } catch (error) {
       console.error("Error fetching path:", error);
       toast({
         title: "Error finding path",
         description: "Failed to retrieve path. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -138,10 +141,6 @@ const MapComponent: React.FC<MapComponentProps> = ({ onPathFound }) => {
   const drawPath = (path: Location[]) => {
     const map = mapInstanceRef.current;
     if (!map) return;
-
-    if (pathLayerRef.current) {
-      map.removeLayer(pathLayerRef.current);
-    }
 
     const latLngs = path.map(node => [node.latitude, node.longitude] as [number, number]);
 
@@ -154,28 +153,18 @@ const MapComponent: React.FC<MapComponentProps> = ({ onPathFound }) => {
       return;
     }
 
-    pathLayerRef.current = L.polyline(latLngs, { color: '#4CAF50', weight: 4 }).addTo(map);
-    map.fitBounds(pathLayerRef.current.getBounds());
+    L.polyline(latLngs, { color: '#4CAF50', weight: 4 }).addTo(map);
+    map.fitBounds(latLngs);
   };
+
   const resetMap = () => {
     if (!mapInstanceRef.current) return;
 
-    if (startMarkerRef.current) {
-      mapInstanceRef.current.removeLayer(startMarkerRef.current);
-      startMarkerRef.current = null;
-    }
-    if (endMarkerRef.current) {
-      mapInstanceRef.current.removeLayer(endMarkerRef.current);
-      endMarkerRef.current = null;
-    }
-    if (pathLayerRef.current) {
-      mapInstanceRef.current.removeLayer(pathLayerRef.current);
-      pathLayerRef.current = null;
-    }
+    markersRef.current.forEach(marker => mapInstanceRef.current?.removeLayer(marker));
+    markersRef.current = [];
 
-    setStartCoordinates('');
-    setEndCoordinates('');
-    toast({ title: "Map reset", description: "Select new start and end points." });
+    setWaypoints([]);
+    toast({ title: "Map reset", description: "Select new waypoints." });
   };
 
   return (
@@ -183,34 +172,18 @@ const MapComponent: React.FC<MapComponentProps> = ({ onPathFound }) => {
       <div ref={mapRef} className="h-[500px] w-full rounded-lg shadow-md z-10" />
       <div className="flex justify-between items-center gap-4">
         <div className="flex flex-col gap-2 flex-1">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500 self-center" />
-            <span className="text-sm font-medium">Start:</span>
-          </div>
-          <input
-            type="text"
-            value={startCoordinates}
-            readOnly
-            className="p-2 border rounded-md text-sm bg-muted"
-            placeholder="Click on map to set start"
-          />
-        </div>
-        <div className="flex flex-col gap-2 flex-1">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500 self-center" />
-            <span className="text-sm font-medium">End:</span>
-          </div>
-          <input
-            type="text"
-            value={endCoordinates}
-            readOnly
-            className="p-2 border rounded-md text-sm bg-muted"
-            placeholder="Click on map to set end"
-          />
+          <span className="text-sm font-medium">Waypoints:</span>
+          <ul className="list-disc pl-4">
+            {waypoints.map((waypoint, index) => (
+              <li key={index}>
+                {waypoint.name} - Lat: {waypoint.latitude}, Long: {waypoint.longitude}
+              </li>
+            ))}
+          </ul>
         </div>
         <button
           onClick={findPath}
-          disabled={!startCoordinates || !endCoordinates}
+          disabled={waypoints.length < 2}
           className="bg-eco px-4 py-2 text-white rounded-md hover:bg-eco-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed h-[42px] self-end"
         >
           Find Path
